@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {sanguoshaSetup,sanguoshaAct,sanguoshaView,SG_HEROES} from '../lib/sanguosha.ts';
+function game(n=4){const g:any={kind:'sanguosha',players:Array.from({length:n},(_,i)=>`p${i}`),turn:'p0',phase:'play',winner:null};sanguoshaSetup(g);return g;}
+function start(n=4){const g=game(n);g.sg.candidates=Object.fromEntries(g.players.map((p:string,i:number)=>[p,[['zhangfei','guanyu','zhaoyun','ganning','luxun','huatuo'][i]]]));for(const p of g.players)sanguoshaAct(g,p,{type:'selectHero',hero:g.sg.candidates[p][0]});return g;}
+test('25 heroes, unique private selection and lord-only identity disclosure',()=>{const g=game(6);assert.equal(SG_HEROES.length,25);assert.equal(new Set(Object.values(g.sg.candidates).flat()).size,18);const v=sanguoshaView(g,'p0');assert.equal(v.candidates.length,3);assert.equal(v.seats.filter((p:any)=>p.role).length,g.sg.roles.p0==='lord'?1:2);assert.equal(JSON.stringify(v).includes('"deck"'),false);assert.equal(v.pendingPlayers.length,6);});
+test('all select before five-card deal plus lord first draw',()=>{const g=start(2);const lord=g.players.find((p:string)=>g.sg.roles[p]==='lord');assert.equal(g.turn,lord);assert.equal(g.sg.hands[lord].length,7);assert.equal(g.sg.hands[g.players.find((p:string)=>p!==lord)].length,5);assert.equal(sanguoshaView(g,lord).seats.every((p:any)=>p.hero),true);});
+test('out of turn cannot play and view never exposes rival hand',()=>{const g=start();const other=g.players.find((p:string)=>p!==g.turn);assert.throws(()=>sanguoshaAct(g,other,{type:'end'}));const v=sanguoshaView(g,other);assert.ok(v.hand);assert.equal(v.seats.some((p:any)=>'hand'in p),false);assert.equal(v.candidates.length,0);});

@@ -1,0 +1,2 @@
+export async function identity(req: Request) { let token = req.headers.get('cookie')?.match(/(?:^|;\s*)yiju_session=([a-f0-9-]{72})/)?.[1]; const fresh = !token; if (!token)
+    token = crypto.randomUUID() + crypto.randomUUID(); const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)); return { id: [...new Uint8Array(bytes)].map(n => n.toString(16).padStart(2, '0')).join(''), token, fresh }; }

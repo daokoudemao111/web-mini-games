@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';
+export const base=process.env.TEST_URL || 'http://127.0.0.1:8787';
+export function testPlayer(){let cookie='';return {
+ async post(a:any,ok=true){const res=await fetch(base+'/api/room',{method:'POST',headers:{'Content-Type':'application/json',Origin:base,Cookie:cookie},body:JSON.stringify(a)});cookie=res.headers.get('set-cookie')?.split(';')[0]||cookie;const result:any=await res.json();assert.equal(res.ok,ok,JSON.stringify(result));return result;},
+ async get(code:string){const res=await fetch(base+'/api/room?code='+code,{headers:{Cookie:cookie}});const result:any=await res.json();assert.ok(res.ok,JSON.stringify(result));return result;}
+};}
+export async function startTable(game:string,n:number){const clients=Array.from({length:n},testPlayer);let r=await clients[0].post({action:'create',game,name:'新游测试1'});const code=r.code;for(let i=1;i<n;i++)await clients[i].post({action:'join',code,name:'新游测试'+(i+1)});for(const c of clients)await c.post({action:'ready',code});r=await clients[0].post({action:'start',code});const ids=(await Promise.all(clients.map(c=>c.get(code)))).map(r=>r.me);return {clients,ids,code,room:r,async move(i:number,move:any,ok=true){const latest=await clients[i].get(code);return clients[i].post({action:'move',code,version:latest.version,move},ok);},async destroy(){for(const c of clients)await c.post({action:'presence',code,away:true});}};}

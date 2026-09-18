@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {startTable} from './new-game-clients.ts';
+const t=await startTable('xiangqi',2);
+assert.equal(t.room.match.board.filter(Boolean).length,32);
+assert.equal(t.room.match.legalMoves.length,44);
+await t.move(1,{type:'move',from:27,to:36},false);
+await t.move(0,{type:'move',from:54,to:45});
+await t.move(1,{type:'move',from:27,to:36});
+await t.move(0,{type:'undo'});
+const pending=await t.clients[1].get(t.code);assert.deepEqual(pending.match.pendingPlayers,[t.ids[1]]);
+await t.move(1,{type:'answerUndo',accept:true});
+assert.equal((await t.clients[0].get(t.code)).match.moveCount,0);
+await t.move(0,{type:'resign'});
+const end=await t.clients[1].get(t.code);assert.equal(end.match.winner,t.ids[1]);assert.equal(end.players.find((p:any)=>p.id===t.ids[1]).score,1);
+await t.clients[0].post({action:'reset',code:t.code});for(const c of t.clients)await c.post({action:'ready',code:t.code});const replay=await t.clients[0].post({action:'start',code:t.code});assert.equal(replay.match.players[0],t.ids[1]);
+await t.destroy();console.log('PASS Xiangqi HTTP: turns, agreed undo, win/score, swapped replay, cleanup');

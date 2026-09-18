@@ -1,0 +1,22 @@
+'use client';
+import {FormEvent,useEffect,useState} from 'react';
+import {DrawingCanvas as Canvas,DrawingCountdown as Countdown} from './drawing-canvas';
+import './drawguess-game.css';
+type Props={g:any;me:string;code:string;disabled:boolean;move:(m:any)=>Promise<boolean>;playerName:(id:string)=>string};
+function WordHint({deadline,serverNow,length,category}:{deadline:number;serverNow:number;length:number;category?:string}){const [left,setLeft]=useState(()=>Math.max(0,deadline-serverNow));useEffect(()=>{const start=Date.now(),base=Math.max(0,deadline-serverNow);const timer=setInterval(()=>setLeft(Math.max(0,base-(Date.now()-start))),500);return()=>clearInterval(timer);},[deadline,serverNow]);return <p className="dg-word-hint" style={{gridColumn:'1 / -1'}}>{length} 个字{left<=30000&&category?` · 提示：${category}`:''}</p>}
+export function DrawguessGame({g,me,code,disabled,move,playerName}:Props){
+ const [guess,setGuess]=useState(''),[galleryTurn,setGalleryTurn]=useState<string|null>(null);const drawer=g.turn===me,isDrawing=g.phase==='drawing';
+ useEffect(()=>{setGuess('');setGalleryTurn(g.phase==='finished'?g.history?.[0]?.turnKey||null:null);},[g.turnKey,g.phase]);
+ const submit=async(e:FormEvent)=>{e.preventDefault();const text=guess.trim();if(!text)return;if(await move({type:'guess',text,turnKey:g.turnKey}))setGuess('');};
+ const ranking=Object.entries(g.scores||{}).sort((a:any,b:any)=>b[1]-a[1]);
+ if(g.phase==='finished')return <section className="dg-game"><header className="dg-title"><div><small>DRAW &amp; GUESS</small><h2>你画我猜 · 本局画廊</h2></div></header><div className="dg-finish"><div className="dg-podium">{ranking.map(([p,score]:any,i)=><div key={p}><b>{i+1}</b><span>{playerName(p)}</span><strong>{score} 分</strong></div>)}</div>{g.history?.length?<div className="dg-gallery-tabs">{g.history.map((h:any)=><button className={galleryTurn===h.turnKey?'active':''} key={h.turnKey} onClick={()=>setGalleryTurn(h.turnKey)}>{playerName(h.drawer)} · {h.answer}</button>)}</div>:<p className="muted">这局还没有留下画作。</p>}{galleryTurn&&<Canvas key={galleryTurn} code={code} turnKey={galleryTurn} editable={false} active={false}/>}</div></section>;
+ return <section className="dg-game"><header className="dg-title"><div><small>DRAW &amp; GUESS</small><h2>{g.phase==='choose'?'选一个好画的词':g.phase==='reveal'?'答案揭晓':drawer?'尽情画，让大家猜':'看画猜词'}</h2></div><div className="dg-round">第 {g.turnNumber} / {g.totalTurns} 题<br/><Countdown deadline={g.deadline} serverNow={g.serverNow}/></div></header>
+  <div className="dg-scorebar">{g.players.map((p:string)=><div key={p} className={p===g.turn?'drawer':''}><span>{playerName(p)}{p===me?' · 你':''}</span><strong>{g.scores?.[p]||0}</strong>{p===g.turn&&<small>画手</small>}</div>)}</div>
+  {g.phase==='choose'?(drawer?<div className="dg-choices">{g.choices?.map((word:string,index:number)=><button key={index} disabled={disabled} onClick={()=>move({type:'choose',index,turnKey:g.turnKey})}><small>候选 {index+1}</small><strong>{word}</strong></button>)}</div>:<div className="dg-wait"><b>{playerName(g.turn)} 正在选词</b><p>选词后有 90 秒作画，猜得越快分数越高。</p></div>):<>
+   <div className="dg-play"><div><Canvas key={g.turnKey} code={code} turnKey={g.turnKey} editable={isDrawing&&drawer&&!disabled} active={isDrawing&&drawer}/>{isDrawing&&drawer&&<div className="dg-secret">你的题目 <strong>{g.answer}</strong><span>{g.category||'自由题库'}</span></div>}{isDrawing&&!drawer&&<form className="dg-guess" onSubmit={submit}><WordHint deadline={g.deadline} serverNow={g.serverNow} length={g.wordLength} category={g.category}/><input value={guess} onChange={e=>setGuess(e.target.value)} maxLength={40} disabled={disabled||g.guessed?.includes(me)} placeholder={g.guessed?.includes(me)?'你已经猜中了':'输入你的答案…'}/><button className="primary" disabled={disabled||g.guessed?.includes(me)||!guess.trim()}>提交答案</button><p>按猜中顺序可得 100 / 80 / 60 / 40 / 20 分，画手每猜中一人得 20 分。</p></form>}</div>
+    <aside className="dg-feed"><h3>本题动态</h3>{g.messages?.length?g.messages.map((m:any,i:number)=><p key={`${m.id}-${i}`}><b>{playerName(m.id)}</b>{m.rank?` 第 ${m.rank} 个猜中，+${m.points} 分`:`：${m.text||'提交了答案'}`}</p>):<p className="muted">还没有人提交答案。</p>}<h3>还在猜</h3><p className="dg-pending">{g.pendingPlayers?.map(playerName).join('、')||'大家都完成了'}</p></aside>
+   </div>
+   {g.phase==='reveal'&&<div className="dg-reveal"><small>答案是</small><strong>{g.answer}</strong><span>稍后自动进入下一题</span></div>}
+  </>}
+ </section>;
+}

@@ -1,5 +1,14 @@
+import {drawphoneSetup,drawphoneAct,drawphoneView} from './drawphone.ts';
+import {drawguessSetup,drawguessAct,drawguessView} from './drawguess.ts';
+import {xiangqiSetup,xiangqiAct,xiangqiView} from './xiangqi.ts';
+import {sanguoshaSetup,sanguoshaAct,sanguoshaView} from './sanguosha.ts';
+import {riichiSetup,riichiAct,riichiView} from './riichi.ts';
 import { beats } from './cards.ts';
-export type GameId = 'gomoku' | 'landlord' | 'spy';
+export type {GameId} from './catalog.ts';
+import type {GameId} from './catalog.ts';
+import {supportsPlayers} from './catalog.ts';
+import {goSetup,goAct,goView} from './go.ts';
+import {checkersSetup,checkersAct,checkersView} from './checkers.ts';
 // Internal state is never serialized directly: playerView is the only client boundary.
 export type Game = {
     kind: GameId;
@@ -9,8 +18,8 @@ export type Game = {
     winner: string | null;
     [key: string]: any;
 };
-export function check(ok: unknown, message = '这个操作现在不能进行'): asserts ok { if (!ok)
-    throw new Error(message); }
+export {check} from './game-check.ts';
+import {check} from './game-check.ts';
 const pairs = [['月亮', '太阳'], ['奶茶', '咖啡'], ['火锅', '烧烤'], ['沙发', '椅子'], ['地铁', '公交'], ['西瓜', '哈密瓜'], ['手机', '平板'], ['饺子', '馄饨'], ['雪糕', '冰淇淋'], ['口红', '唇膏'], ['海豚', '鲸鱼'], ['耳机', '音箱'], ['围巾', '领带'], ['电影', '电视剧'], ['雨衣', '雨伞'], ['面包', '蛋糕'], ['星星', '萤火虫'], ['牙膏', '洗面奶'], ['橙子', '橘子'], ['书包', '行李箱']];
 function random(n: number) { const a = new Uint32Array(1), limit = Math.floor(4294967296 / n) * n; do {
     crypto.getRandomValues(a);
@@ -20,11 +29,18 @@ function shuffle<T>(a: T[]) { for (let i = a.length - 1; i > 0; i--) {
     [a[i], a[j]] = [a[j], a[i]];
 } return a; }
 function deal(g: Game) { const deck = shuffle(Array.from({ length: 54 }, (_, i) => i)); g.hands = Object.fromEntries(g.players.map((id, i) => [id, deck.slice(i * 17, i * 17 + 17)])); g.bottom = deck.slice(51); g.bid = 0; g.bidder = null; g.bidCount = 0; g.phase = 'bid'; g.turn = g.players[0]; g.last = null; g.lastPlayer = null; g.passes = 0; g.plays = {}; g.multiplier = 1; g.bidLog = []; }
-export function newGame(kind: GameId, players: string[]): Game {
-    check(['gomoku', 'landlord', 'spy'].includes(kind), '未知游戏');
+export function newGame(kind: GameId, players: string[], options: {size?:number;rounds?:number} = {}): Game {
+    check(['drawphone','drawguess', 'gomoku', 'landlord', 'spy', 'go', 'checkers', 'xiangqi', 'sanguosha', 'riichi'].includes(kind), '未知游戏');
     check(new Set(players).size === players.length, '座位重复');
-    check(kind === 'gomoku' ? players.length === 2 : kind === 'landlord' ? players.length === 3 : players.length >= 4 && players.length <= 6, '游戏人数不符合要求');
+    check(supportsPlayers(kind,players.length), '游戏人数不符合要求');
     const g: Game = { kind, players: [...players], turn: players[0], phase: 'play', winner: null };
+    if (kind === 'drawphone') drawphoneSetup(g);
+    if (kind === 'drawguess') drawguessSetup(g,options.rounds);
+    if (kind === 'xiangqi') xiangqiSetup(g);
+    if (kind === 'sanguosha') sanguoshaSetup(g);
+    if (kind === 'riichi') riichiSetup(g);
+    if (kind === 'go') goSetup(g,options.size);
+    if (kind === 'checkers') checkersSetup(g);
     if (kind === 'gomoku') {
         g.board = Array(225).fill(null);
         g.moves = [];
@@ -52,6 +68,13 @@ export function act(g: Game, id: string, a: any) {
     check(g.players.includes(id), '你不在这局游戏中');
     check(!g.winner, '本局已经结束');
     check(a && typeof a.type === 'string', '无效操作');
+    if (g.kind === 'drawphone') return drawphoneAct(g,id,a);
+    if (g.kind === 'drawguess') return drawguessAct(g,id,a);
+    if (g.kind === 'xiangqi') return xiangqiAct(g,id,a);
+    if (g.kind === 'sanguosha') return sanguoshaAct(g,id,a);
+    if (g.kind === 'riichi') return riichiAct(g,id,a);
+    if (g.kind === 'go') return goAct(g,id,a);
+    if (g.kind === 'checkers') return checkersAct(g,id,a);
     if (g.kind === 'gomoku') {
         if (a.type === 'resign') {
             g.winner = g.players.find(p => p !== id)!;
@@ -158,7 +181,7 @@ export function act(g: Game, id: string, a: any) {
     check(g.alive.includes(id), '你已出局，可以继续观战');
     if (g.phase === 'describe') {
         check(a.type === 'describe' && g.turn === id, '还没轮到你描述');
-        check(typeof a.text === 'string' && a.text.trim().length > 0 && a.text.trim().length <= 100, '请输入1～100字的描述');
+        check(typeof a.text === 'string' && a.text.length <= 100, '描述最多100字');
         g.history.push({ id, text: a.text.trim(), round: g.round, revote: g.revote });
         g.queue.shift();
         if (g.queue.length)
@@ -208,6 +231,13 @@ export function act(g: Game, id: string, a: any) {
 export function playerView(g: Game, id: string): any {
     check(g.players.includes(id), '你不在这局游戏中');
     const base = { kind: g.kind, players: g.players, turn: g.turn, phase: g.phase, winner: g.winner };
+    if (g.kind === 'drawphone') return {...base,...drawphoneView(g,id)};
+    if (g.kind === 'drawguess') return {...base,...drawguessView(g,id)};
+    if (g.kind === 'xiangqi') return {...base,...xiangqiView(g,id)};
+    if (g.kind === 'sanguosha') return {...base,...sanguoshaView(g,id)};
+    if (g.kind === 'riichi') return {...base,...riichiView(g,id)};
+    if (g.kind === 'go') return {...base,...goView(g)};
+    if (g.kind === 'checkers') return {...base,...checkersView(g)};
     if (g.kind === 'gomoku')
         return { ...base, board: g.board, moves: g.moves, undo: g.undo };
     if (g.kind === 'landlord')

@@ -53,7 +53,7 @@ console.log('PASS homepage render');
     assert.equal(end.players.reduce((sum: number, p: any) => sum + p.score, 0), 0);
     console.log('PASS three-player full landlord + private hands + zero-sum score');
 }
-for (const n of [4, 5, 6]) {
+for (const n of [3, 4, 5, 6]) {
     const { ps, room, ids, move } = await setup('spy', n);
     const views = await Promise.all(ps.map(p => p.get(room.code)));
     for (const v of views) {
@@ -84,6 +84,8 @@ const abandoned = client();
 const empty = await abandoned.post({ action: 'create', game: 'gomoku', name: '离开玩家' });
 await abandoned.post({ action: 'leave', code: empty.code });
 const replacement = client();
-const adopted = await replacement.post({ action: 'join', code: empty.code, name: '新房主' });
-assert.equal(adopted.host, adopted.me);
-console.log('PASS empty room assigns new host');
+await replacement.post({ action: 'join', code: empty.code, name: '新房主' }, false);
+console.log('PASS empty room deleted');
+
+assert.match(r.code,/^\d{6}$/);
+const clean=client(),peer=client();const cr=await clean.post({action:'create',game:'gomoku',name:'退出甲'});await peer.post({action:'join',code:cr.code,name:'退出乙'});await clean.post({action:'presence',code:cr.code,away:true});assert.ok((await peer.get(cr.code)).players);const last=await peer.post({action:'presence',code:cr.code,away:true});assert.equal(last.deleted,true);await clean.post({action:'presence',code:cr.code,away:false},false);console.log('PASS numeric code + last away deletes room');

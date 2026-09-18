@@ -1,0 +1,3 @@
+export const avatarColors=['#d3e2be','#ead8c7','#ddd6ec','#c7e2e5','#f0d4da','#e8dfb6'];
+export function chooseColor(preferred:unknown,used:string[]){return (typeof preferred==='string'&&avatarColors.includes(preferred)&&!used.includes(preferred)?preferred:avatarColors.find(c=>!used.includes(c)))||avatarColors[0];}
+export function needsAction(g:any,id:string){if(!g||g.winner)return false;if(Array.isArray(g.pendingPlayers))return g.pendingPlayers.includes(id);if(g.kind==='spy'&&g.phase==='vote')return g.alive.includes(id)&&!g.voted.includes(id);if(g.kind==='go'&&g.phase==='scoring')return !g.confirmed.includes(id);if(g.kind==='gomoku'&&g.undo)return g.undo!==id;return g.turn===id;}

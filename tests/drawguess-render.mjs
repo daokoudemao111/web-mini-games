@@ -1,0 +1,18 @@
+import { build } from 'esbuild';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement } from 'react';
+import assert from 'node:assert/strict';
+import { newGame, act, playerView } from '../lib/games.ts';
+import { drawguessTick } from '../lib/drawguess.ts';
+await build({entryPoints:['app/drawguess-game.tsx'],bundle:true,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'},outfile:'outputs/drawguess-render.mjs',logLevel:'silent'});
+const { DrawguessGame }=await import('../outputs/drawguess-render.mjs?'+Date.now());
+const g=newGame('drawguess',['drawer','guesser']);
+const render=(me)=>renderToStaticMarkup(createElement(DrawguessGame,{g:playerView(g,me),me,code:'123456',disabled:false,move:async()=>true,playerName:id=>id==='drawer'?'画手':'猜词者'}));
+assert.match(render('drawer'),/候选/);assert.doesNotMatch(render('guesser'),/候选 1/);
+const word=playerView(g,'drawer').choices[0];act(g,'drawer',{type:'choose',index:0,turnKey:g.turnKey});
+assert.match(render('drawer'),/绘画区域/);assert.match(render('drawer'),/画笔工具/);
+assert.match(render('guesser'),/输入你的答案/);assert.match(render('guesser'),/个字/);assert.ok(!render('guesser').includes(word));
+act(g,'guesser',{type:'guess',text:word,turnKey:g.turnKey});assert.match(render('guesser'),/答案揭晓/);assert.ok(render('guesser').includes(word));
+drawguessTick(g,g.deadline);for(let i=0;i<3;i++)drawguessTick(g,g.deadline);
+assert.match(render('guesser'),/本局画廊/);assert.match(render('guesser'),/100/);
+console.log('PASS React rendering: drawer/guesser choice privacy, drawing tools, answer form, reveal, final gallery');
