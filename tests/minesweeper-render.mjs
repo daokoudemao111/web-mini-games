@@ -1,0 +1,10 @@
+import {build} from 'esbuild';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {createElement} from 'react';
+import assert from 'node:assert/strict';
+await build({entryPoints:['app/minesweeper/page.tsx'],bundle:true,platform:'node',format:'esm',packages:'external',loader:{'.css':'empty'},outfile:'outputs/minesweeper-render.mjs',logLevel:'silent'});
+const {default:Page,formatMineTime}=await import('../outputs/minesweeper-render.mjs?'+Date.now());
+const html=renderToStaticMarkup(createElement(Page));
+assert.equal((html.match(/data-cell=/g)||[]).length,81);for(const text of ['简单','中等','困难','翻格','插旗','本机最佳','返回大厅','首次点击及周围八格安全'])assert.ok(html.includes(text));
+assert.ok(!html.includes('创建房间'));assert.equal(formatMineTime(65),'01:05');assert.equal(formatMineTime(3600),'60:00');
+console.log('PASS SSR: 81 cells, difficulty selection, flag controls, local record, direct solo page');

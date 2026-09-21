@@ -1,7 +1,7 @@
 import { drawphoneTick } from './drawphone.ts';
 import { drawguessTick } from './drawguess.ts';
 import {chooseColor} from './presentation.ts';
-import { supportsPlayers, isGameAvailable } from './catalog.ts';
+import { supportsPlayers, isGameAvailable, isRoomGameAvailable } from './catalog.ts';
 import { env } from 'cloudflare:workers';
 import { act, check, newGame, playerView } from './games.ts';
 import type { Game, GameId } from './games.ts';
@@ -51,7 +51,7 @@ export async function readRoom(code: string, id: string) {
 }
 export async function updateRoom(a: any, id: string) {
     if (a.action === 'create') {
-        check(typeof a.game === 'string' && isGameAvailable(a.game), '请选择游戏');
+        check(typeof a.game === 'string' && isRoomGameAvailable(a.game), '请选择游戏');
         const name = validateName(a.name);
         for (let i = 0; i < 5; i++) {
             const bytes = crypto.getRandomValues(new Uint8Array(6));
